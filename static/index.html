@@ -39,7 +39,9 @@ function sendJSONXMLHTTPRequest(url, objects, callback) {
             try {
                 if (xhr.status==200) {
                     //XXX: parse some JSON from the request!
+                    var responseParse = JSON.parse(xhr.response)
                     //XXX: Pass the data to the callback!
+                    callback(responseParse)
                 }
             } 
             catch(e) {
@@ -48,8 +50,13 @@ function sendJSONXMLHTTPRequest(url, objects, callback) {
         }
     };
     //XXX: POST to a URL
+    xhr.open(objects['method']? objects['method']: 'POST', url)
     //XXX: set the mimetype and the accept headers!
     // Remember to use application/json !
+    var jsonObjects = JSON.stringify(objects['body']? objects['body']: {})
+    xhr.setRequestHeader("Content-Type", "application/json")
+    xhr.setRequestHeader("Accept", "application/json")
+    xhr.send(jsonObjects)
 }
 
 
@@ -65,7 +72,11 @@ function drawCircle(context,entity) {
         //moveTo(x,y);
         fillStyle = entity["colour"];
         strokeStyle = fillStyle;
-        arc(x, y, (entity["radius"])?entity["radius"]:50, 0, 2.0 * Math.PI, false);  
+        entity["radius"] ? rect(x, y, entity["radius"], entity["radius"]): rect(x, y, 30, 30)
+        shadowOffsetX = 10
+        shadowOffsetY = 10
+        shadowBlur = 30
+        shadowColor = "purple"
         stroke();                                
     }
 }
@@ -136,10 +147,18 @@ function getPosition(e) {
 
 function addEntity(entity, data) {
     world[entity] = data;
-    drawNextFrame(); // (but should we?)
+    // drawNextFrame(); // (but should we?)
     //XXX: Send a XHTML Request that updates the entity you just  modified!
-
-}
+    let requestObject = {
+        method: "POST",
+        body: data
+    }
+    let requestUrl = "http://" + host + '/entity/' + entity
+    sendJSONXMLHTTPRequest(requestUrl, requestObject, (d) => {
+        world[entity] = d;
+        drawNextFrame();
+    })
+}       
 
 var counter = 0;
 function addEntityWithoutName(data) {
@@ -184,7 +203,7 @@ mouse = (function() {
                 var pos = getPosition(e);
                 var x = pos[0];
                 var y = pos[1];
-	        self.clicked = 1;
+	            self.clicked = 1;
                 self.callListeners(self.mousedowners,x,y,self.clicked,e);
                 //addEntityWithoutName({'x':x,'y':y,'colour':'red'});
             }
@@ -197,7 +216,7 @@ mouse = (function() {
                 var x = pos[0];
                 var y = pos[1];
 	        //self.poppin(x,y);
-	        self.clicked = 0;
+	            self.clicked = 0;
                 self.selected = -1;
                 self.callListeners(self.mouseuppers,x,y,self.clicked,e);
                 //addEntityWithoutName({'x':x,'y':y,'colour':'blue'});
@@ -219,24 +238,24 @@ mouse = (function() {
                 var y = pos[1];
 	        if (self.clicked != 0) {
 	            //self.squeakin(x,y);
-                    self.callListeners(self.mousedraggers,x,y,self.clicked,e);
+                self.callListeners(self.mousedraggers,x,y,self.clicked,e);
 	        }
-                self.callListeners(self.mousemovers,x,y,self.clicked,e);
+            self.callListeners(self.mousemovers,x,y,self.clicked,e);
             }            
 	},
 	touchmove: function(e) {
-            self.lasttouch = e;                                         
-            return self.mousemove(e);
+        self.lasttouch = e;                                         
+        return self.mousemove(e);
 	},
 	// Install the mouse listeners
 	mouseinstall: function() {
-            canvas.addEventListener("mousedown",  self.mousedown, false);
-            canvas.addEventListener("mousemove",  self.mousemove, false);
-            canvas.addEventListener("mouseup",    self.mouseup, false);
-            canvas.addEventListener("mouseout",   self.mouseout, false);
-            canvas.addEventListener("touchstart", self.touchstart, false);
-            canvas.addEventListener("touchmove",  self.touchmove, false);
-            canvas.addEventListener("touchend",   self.touchend, false);
+        canvas.addEventListener("mousedown",  self.mousedown, false);
+        canvas.addEventListener("mousemove",  self.mousemove, false);
+        canvas.addEventListener("mouseup",    self.mouseup, false);
+        canvas.addEventListener("mouseout",   self.mouseout, false);
+        canvas.addEventListener("touchstart", self.touchstart, false);
+        canvas.addEventListener("touchmove",  self.touchmove, false);
+        canvas.addEventListener("touchend",   self.touchend, false);
 	}
     };
     // Force install!
@@ -247,22 +266,32 @@ mouse = (function() {
 // Add the application specific mouse listeners!
 //XXX: TODO Make these prettier!
 mouse.mousedowners.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'blue'});
+    addEntityWithoutName({'x':x,'y':y,'colour':'white'});
 });
 
 mouse.mouseuppers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'red'});
+    addEntityWithoutName({'x':x,'y':y,'colour':'white'});
 });
 
 mouse.mousedraggers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'green',
-                          'radius':10});
+    addEntityWithoutName({'x':x,'y':y,'colour':'#5D3FD3',
+                          'radius':20});
 });
 
 
 function update() {
     //XXX: TODO Get the world from the webservice using a XMLHTTPRequest
+    let requestUrl = 'http://' + host + '/world' 
+    let requestObject = {
+        method: "GET"
+    }
+    sendJSONXMLHTTPRequest(requestUrl, requestObject,  (d) => {
+        world = d
+        drawNextFrame()
+    })
+
     drawFrame();
+
 }
 
 // 30 frames per second
